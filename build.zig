@@ -108,23 +108,6 @@ pub fn build(b: *std.Build) !void {
             }
         }
     }
-
-    // Clean the cache folders and artifacts. Creates a binary that cleans up
-    // Zig artifact folders.
-    const clean = b.addExecutable(.{
-        .name = "clean",
-        .root_source_file = b.path("bin/clean_zig_cache.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    // Creates a run step.
-    const clean_step = b.addRunArtifact(clean);
-
-    // Register clean command i.e, Zig build clean to cleanup any artifacts
-    // and cache.
-    const clean_cmd = b.step("clean", "Cleans the cache folders");
-    clean_cmd.dependOn(&clean_step.step);
 }
 
 fn getCudaPath(b: *std.Build, path: ?[]const u8) ![]const u8 {
