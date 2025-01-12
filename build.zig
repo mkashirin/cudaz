@@ -2,8 +2,6 @@ const std = @import("std");
 const utils = @import("test/utils.zig");
 
 pub fn build(b: *std.Build) !void {
-    // std.debug.print("CUDA version: {s}", .{getCudaVersion().?});
-
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -12,7 +10,7 @@ pub fn build(b: *std.Build) !void {
         "CUDA_PATH",
         "locally installed Cuda's path",
     );
-    const cuda_folder = try getCudaPath(b, cuda_path, b.allocator);
+    const cuda_folder = try getCudaPath(b, cuda_path);
     const cuda_include_dir = try std.fmt.allocPrint(
         b.allocator,
         "{s}/include",
@@ -129,46 +127,54 @@ pub fn build(b: *std.Build) !void {
     clean_cmd.dependOn(&clean_step.step);
 }
 
-fn getCudaPath(
-    b: *std.Build,
-    path: ?[]const u8,
-    allocator: std.mem.Allocator,
-) ![]const u8 {
-    // Return of `cuda_parent` folder confirms presence of include directory.
+fn getCudaPath(b: *std.Build, path: ?[]const u8) ![]const u8 {
+    // Return the `cuda_parent` folder if it contains the `include/cuda.h` file.
     return inclpath: {
         if (path) |parent| {
             const cuda_file = try std.fmt.allocPrint(
-                allocator,
+                b.allocator,
                 "{s}/include/cuda.h",
                 .{parent},
             );
-            defer allocator.free(cuda_file);
+            defer b.allocator.free(cuda_file);
+
             _ = std.fs.openFileAbsolute(cuda_file, .{}) catch |err| {
                 switch (err) {
                     std.fs.File.OpenError.FileNotFound => {
-                        return error.CUDA_INSTALLATION_NOT_FOUND;
+                        return error.CudaInstallationNotFound;
                     },
                     else => return err,
                 }
             };
-            // Ignore `cuda.h`.
-            break :inclpath parent;
+            break :inclpath try b.allocator.dupe(u8, parent);
         } else {
-            const probable_roots = getProbableCudaRoots(b);
-            inline for (probable_roots) |parent| h: {
-                const cuda_file = parent ++ "/include/cuda.h";
-                _ = std.fs.openFileAbsolute(cuda_file, .{}) catch {
-                    break :h;
-                };
-                // Ignore `cuda.h`.
-                break :inclpath parent;
+            // If no specific path is provided, search in probable CUDA roots
+            const probable_roots = try getProbableCudaRoots(b);
+            defer {
+                for (probable_roots) |root| {
+                    b.allocator.free(root);
+                }
+                b.allocator.free(probable_roots);
             }
-            return error.CUDA_INSTALLATION_NOT_FOUND;
+
+            for (probable_roots) |parent| {
+                const cuda_file = try std.fmt.allocPrint(
+                    b.allocator,
+                    "{s}/include/cuda.h",
+                    .{parent},
+                );
+                defer b.allocator.free(cuda_file);
+
+                _ = std.fs.openFileAbsolute(cuda_file, .{}) catch continue;
+                break :inclpath try b.allocator.dupe(u8, parent);
+            }
+
+            return error.CudaInstallationNotFound;
         }
     };
 }
 
-fn getProbableCudaRoots(b: *std.Build) [5][]const u8 {
+fn getProbableCudaRoots(b: *std.Build) ![][]const u8 {
     const cuda_version = cuver: {
         if (b.option(
             []const u8,
@@ -180,15 +186,26 @@ fn getProbableCudaRoots(b: *std.Build) [5][]const u8 {
             break :cuver "";
         }
     };
-
-    const probable_roots = comptime [_][]const u8{
+    const base_paths = [_][]const u8{
         "/usr/local/cuda",
         "/opt/cuda",
         "/usr/lib/cuda",
         "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/",
     };
-    inline for (probable_roots) |path| {
-        path = path ++ "-" ++ cuda_version;
+
+    var probable_roots = try b.allocator.alloc([]u8, base_paths.len);
+    errdefer b.allocator.free(probable_roots);
+    for (base_paths, 0..) |path, i| {
+        if (cuda_version.len > 0) {
+            probable_roots[i] = try std.fmt.allocPrint(
+                b.allocator,
+                "{s}-{s}",
+                .{ path, cuda_version },
+            );
+        } else {
+            probable_roots[i] = try b.allocator.dupe(u8, path);
+        }
     }
+
     return probable_roots;
 }
