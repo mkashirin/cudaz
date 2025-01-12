@@ -1,6 +1,6 @@
 <h1 align="center">CUDA library for Zig</h1>
 
-<p align="center"><b>Works with latest zig v0.13.0.</b></p>
+<p align="center"><b>Works with latest stable Zig 0.13.0.</b></p>
 
 This library helps to interact with NVIDIA GPUs from Zig. Provides high level
 interface to communicate with GPU. It can detect CUDA installation and link it
