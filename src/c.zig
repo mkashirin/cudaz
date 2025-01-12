@@ -1,9 +1,10 @@
-pub const cuda = @cImport({
-    @cInclude("cuda.h");
-});
-
-pub const curand = @import("curand.zig");
-pub const cuda_runtime = struct {
-    pub extern fn cudaMalloc(devPtr: [*c]?*anyopaque, size: usize) c_uint;
+pub usingnamespace {
+    @cImport({
+        @cInclude("cuda.h");
+        @cInclude("nvrtc.h");
+    });
+    @import("curand.zig");
+    struct {
+        pub extern fn cudaMalloc(devptr: [*c]?*anyopaque, size: usize) c_uint;
+    };
 };
-pub const nvrtc = @cImport(@cInclude("nvrtc.h"));
