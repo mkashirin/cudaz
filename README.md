@@ -60,6 +60,9 @@ pub fn build(b: *std.Build) !void {
 
 ## Quick Start
 
+To run the code below, refer to the example project:
+[increment](./example/increment).
+
 ```zig
 // src/main.zig
 
@@ -115,8 +118,6 @@ pub fn main() !void {
     defer incremented_arr.deinit();
 }
 ```
-For running above code system refer to the example project:
-[increment](./example/increment)
 
 Examples:
 - [Incrementing Array on GPU](examples/increment/)
